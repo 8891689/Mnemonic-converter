@@ -1,7 +1,7 @@
 /*Author: 8891689
  * Assist in creation ：gemini
  */
-//  gcc -o bip32_test bip32.c main.c secp256k1.c base58.c ripemd160.c sha256.c sha512.c pbkdf2.c random.c bip39.c keccak256.c cashaddr.c bech32.c
+//  gcc -o m bip32.c mnemonics.c secp256k1.c base58.c ripemd160.c sha256.c sha512.c pbkdf2.c random.c bip39.c keccak256.c cashaddr.c bech32.c
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,12 +42,49 @@
 #define ENTROPY_BYTES (ENTROPY_BITS / 8)
 #define SEED_BYTES 64
 
-// BIP44 Coin Types (Hardened)
+// BIP44 Coin Types (Hardened) - Existing
 #define COIN_TYPE_BTC   (0 | BIP32_HARDENED)
 #define COIN_TYPE_DOGE  (3 | BIP32_HARDENED)
 #define COIN_TYPE_ETH   (60 | BIP32_HARDENED)
 #define COIN_TYPE_BCH   (145 | BIP32_HARDENED)
 #define COIN_TYPE_TRX   (195 | BIP32_HARDENED)
+
+// BIP44 Coin Types (Hardened) - NEW
+#define COIN_TYPE_LTC   (2 | BIP32_HARDENED)   // Litecoin
+#define COIN_TYPE_DASH  (5 | BIP32_HARDENED)   // Dash
+#define COIN_TYPE_ZEC   (133 | BIP32_HARDENED) // Zcash (t-addr)
+#define COIN_TYPE_BTG   (156 | BIP32_HARDENED) // Bitcoin Gold
+
+// Address Version Bytes (Examples - Verify these are correct for mainnet)
+#define BITCOIN_P2PKH_VERSION  0x00
+#define BITCOIN_P2SH_VERSION   0x05
+#define BITCOIN_WIF_VERSION    0x80
+
+#define LITECOIN_P2PKH_VERSION 0x30 // 'L' addresses
+#define LITECOIN_P2SH_VERSION  0x32 // 'M' addresses (newer) or 0x05 ('3' legacy) - Using 0x30 for P2PKH example
+#define LITECOIN_WIF_VERSION   0xB0
+
+#define DOGECOIN_P2PKH_VERSION 0x1E // 'D' addresses
+#define DOGECOIN_WIF_VERSION   0x9E
+
+#define DASH_P2PKH_VERSION     0x4C // 'X' addresses
+#define DASH_WIF_VERSION       0xCC
+
+#define ZCASH_T_P2PKH_PREFIX1  0x1C // t1... addresses (need 2 bytes)
+#define ZCASH_T_P2PKH_PREFIX2  0xB8
+#define ZCASH_T_P2SH_PREFIX1   0x1C // t3... addresses (need 2 bytes)
+#define ZCASH_T_P2SH_PREFIX2   0xBD
+#define ZCASH_WIF_VERSION      0x80 // Same as Bitcoin
+
+#define BITCOIN_GOLD_P2PKH_VERSION 0x26 // 'G' addresses
+#define BITCOIN_GOLD_P2SH_VERSION  0x17 // 'A' addresses
+#define BITCOIN_GOLD_WIF_VERSION   0x80 // Same as Bitcoin
+
+#define BITCOIN_CASH_PREFIX "bitcoincash" // Already used
+#define BITCOIN_CASH_WIF_VERSION 0x80 // Same as Bitcoin
+
+// Note: Zcash t-addr prefixes are two bytes. Our current base58 function might only handle one.
+// We will calculate the HASH160 for Zcash but might skip full address generation for simplicity unless base58 function is modified.
 
 // BIP Purpose Constants (Hardened)
 #define PURPOSE_BIP44   (44 | BIP32_HARDENED)
@@ -70,10 +107,52 @@ int hash160_to_bech32_addr(const uint8_t hash160[RIPEMD160_DIGEST_LENGTH], const
 int uncompressed_pubkey_to_eth_addr(const uint8_t pubkey_uncompressed[65], char *addr_out, size_t addr_out_len);
 int uncompressed_pubkey_to_trx_addr(const uint8_t pubkey_uncompressed[65], char *addr_out, size_t addr_out_len);
 int hash160_to_cashaddr(const uint8_t hash160[RIPEMD160_DIGEST_LENGTH], const char *prefix, char *addr_out, size_t addr_out_len);
-int private_key_to_wif(const uint8_t private_key[32], bool compressed, char *wif_out, size_t wif_out_len);
+int private_key_to_wif(const uint8_t private_key[32], uint8_t wif_version_byte, bool compressed, char *wif_out, size_t wif_out_len);
 void print_hex(const char* label, const uint8_t* data, size_t len);
+int prefix2_hash160_to_base58_addr(uint8_t prefix1, uint8_t prefix2, const uint8_t hash160[RIPEMD160_DIGEST_LENGTH], char *addr_out, size_t addr_out_len);
 
 // --- Helper Function Implementations ---
+// Generates Base58Check address from HASH160 using a two-byte prefix
+// Specifically for formats like Zcash t-addresses.
+int prefix2_hash160_to_base58_addr(
+    uint8_t prefix1,
+    uint8_t prefix2,
+    const uint8_t hash160[RIPEMD160_DIGEST_LENGTH],
+    char *addr_out,
+    size_t addr_out_len)
+{
+    // 1. Prepare the data buffer: [prefix1][prefix2][hash160]
+    const size_t data_len = 2 + RIPEMD160_DIGEST_LENGTH;
+    uint8_t versioned_hash160[data_len]; // Use VLA (C99+) or malloc if needed
+
+    versioned_hash160[0] = prefix1;
+    versioned_hash160[1] = prefix2;
+    memcpy(versioned_hash160 + 2, hash160, RIPEMD160_DIGEST_LENGTH);
+
+    // 2. Call the existing base58_encode_check (which allocates memory)
+    char *encoded_ptr = base58_encode_check(versioned_hash160, data_len);
+    if (encoded_ptr == NULL) {
+        // fprintf(stderr, "Error: base58_encode_check failed for 2-byte prefix.\n"); // Optional error message
+         if (addr_out_len > 0) addr_out[0] = '\0'; // Clear output buffer on failure
+        return 1; // Indicate failure: encoding failed
+    }
+
+    // 3. Copy the result to the output buffer (check length)
+    size_t encoded_len = strlen(encoded_ptr);
+    if (encoded_len >= addr_out_len) {
+        // fprintf(stderr, "Error: Output buffer too small for Base58Check string (need %zu, have %zu).\n", encoded_len + 1, addr_out_len); // Optional
+        free(encoded_ptr); // IMPORTANT: Free the allocated memory even on error
+         if (addr_out_len > 0) addr_out[0] = '\0'; // Clear output buffer
+        return 2; // Indicate failure: buffer too small
+    }
+
+    strcpy(addr_out, encoded_ptr);
+
+    // 4. Free the allocated memory from base58_encode_check
+    free(encoded_ptr);
+
+    return 0; // Indicate success
+}
 
 // binary_string_to_bytes, extract_11_bits, generate_mnemonic_phrase, mnemonic_to_seed
 // (Keep implementations from previous version, ensure generate_mnemonic_phrase doesn't print entropy)
@@ -218,7 +297,6 @@ int uncompressed_pubkey_to_trx_addr(const uint8_t pubkey_uncompressed[65], char 
 }
 
 // Generates Bitcoin Cash address (CashAddr format)
-// Generates Bitcoin Cash address (CashAddr format)
 int hash160_to_cashaddr(const uint8_t hash160[RIPEMD160_DIGEST_LENGTH], const char *prefix, char *addr_out, size_t addr_out_len) {
     char hash160_hex[41];
     bytes_to_hex(hash160, RIPEMD160_DIGEST_LENGTH, hash160_hex); // Convert HASH160 to hex
@@ -233,30 +311,111 @@ int hash160_to_cashaddr(const uint8_t hash160[RIPEMD160_DIGEST_LENGTH], const ch
     }
 }
 
+// Modified implementation (Accepts wif_version_byte):
+int private_key_to_wif(const uint8_t private_key[32], uint8_t wif_version_byte, bool compressed, char *wif_out, size_t wif_out_len) {
+    size_t data_size = 1 + 32 + (compressed ? 1 : 0);
+    uint8_t wif_data[34]; // Max size: 1 (version) + 32 (key) + 1 (compression flag)
 
-// private_key_to_wif, print_hex
-// (Keep implementations from previous version)
-int private_key_to_wif(const uint8_t private_key[32], bool compressed, char *wif_out, size_t wif_out_len) {
-    size_t data_size = 1 + 32 + (compressed ? 1 : 0); uint8_t wif_data[34];
-    wif_data[0] = 0x80; memcpy(wif_data + 1, private_key, 32); if (compressed) wif_data[1 + 32] = 0x01;
-    char *encoded_ptr = base58_encode_check(wif_data, data_size); if (encoded_ptr == NULL) return 1;
-    size_t encoded_len = strlen(encoded_ptr); if (encoded_len >= wif_out_len) { free(encoded_ptr); return 2; }
-    strcpy(wif_out, encoded_ptr); free(encoded_ptr); return 0;
+    wif_data[0] = wif_version_byte; // Use the provided version byte
+    memcpy(wif_data + 1, private_key, 32);
+    if (compressed) {
+        wif_data[1 + 32] = 0x01; // Append compression flag if needed
+    }
+    // Note: data_size must be correct based on whether compressed is true
+
+    char *encoded_ptr = base58_encode_check(wif_data, data_size);
+    if (encoded_ptr == NULL) {
+        if (wif_out_len > 0) wif_out[0] = '\0';
+        return 1; // Encoding failed
+    }
+
+    size_t encoded_len = strlen(encoded_ptr);
+    if (encoded_len >= wif_out_len) {
+        free(encoded_ptr);
+        if (wif_out_len > 0) wif_out[0] = '\0';
+        return 2; // Output buffer too small
+    }
+
+    strcpy(wif_out, encoded_ptr);
+    free(encoded_ptr);
+    return 0; // Success
 }
+
 void print_hex(const char* label, const uint8_t* data, size_t len) {
     printf("%s", label); for (size_t i = 0; i < len; ++i) printf("%02x", data[i]); printf("\n");
 }
 
 // --- Main Program ---
-int main() {
-    // 1. Generate Mnemonic
-    char *mnemonic = generate_mnemonic_phrase(NUM_WORDS);
-    if (mnemonic == NULL) return 1;
+int main(int argc, char *argv[]) { // Add argc, argv
+    char *mnemonic = NULL;
+    bool free_mnemonic = false; // Flag to know if we allocated mnemonic
+
     printf("--- Wallet Details ---\n");
-    printf("Generated Mnemonic (%d words): %s\n", NUM_WORDS, mnemonic);
+
+    // Check command line arguments for mnemonic
+    if (argc > 1) {
+        // Concatenate arguments into a single mnemonic string
+        size_t total_len = 0;
+        for (int i = 1; i < argc; i++) {
+            total_len += strlen(argv[i]) + 1; // +1 for space or null terminator
+        }
+
+        mnemonic = (char *)malloc(total_len);
+        if (mnemonic == NULL) {
+            fprintf(stderr, "Error: Could not allocate memory for mnemonic string.\n");
+            return 1;
+        }
+        mnemonic[0] = '\0'; // Start with an empty string
+
+        for (int i = 1; i < argc; i++) {
+            strcat(mnemonic, argv[i]);
+            if (i < argc - 1) {
+                strcat(mnemonic, " "); // Add space between words
+            }
+        }
+        printf("Using Mnemonic from arguments: %s\n", mnemonic);
+
+                // --- VALIDATION (Optional - Block Commented Out) ---
+        /*
+        // Count words (simple space count)
+        int word_count = 1;
+        for(char *p = mnemonic; *p; p++) if (*p == ' ') word_count++;
+
+        if (word_count != 12 && word_count != 24) {
+             fprintf(stderr, "Error: Invalid number of words (%d) in provided mnemonic. Must be 12 or 24.\n", word_count);
+             free(mnemonic);
+             return 1;
+        }
+        // Use bip39 check if available
+        #ifdef BIP39_H // Check if bip39.h defines a macro (adapt if needed)
+        // Requires mnemonic_check function in bip39 library
+        if (!mnemonic_check(mnemonic)) {
+             fprintf(stderr, "Error: Invalid mnemonic phrase provided (checksum or word mismatch).\n");
+             free(mnemonic);
+             return 1;
+        }
+        printf("Mnemonic provided is valid.\n");
+        #else
+        printf("Warning: Mnemonic validation function (mnemonic_check) not detected. Skipping validation.\n");
+        #endif
+        */
+        // --- END VALIDATION ---
+
+    } else {
+        // Generate random mnemonic if no arguments provided
+        printf("No mnemonic provided via arguments. Generating a random one...\n");
+        mnemonic = generate_mnemonic_phrase(NUM_WORDS);
+        if (mnemonic == NULL) {
+             fprintf(stderr, "Error: Failed to generate random mnemonic.\n");
+            return 1;
+        }
+        free_mnemonic = true; // Mark that we need to free this later
+        printf("Generated Mnemonic (%d words): %s\n", NUM_WORDS, mnemonic);
+    }
+
     printf("Passphrase Used: \"%s\"\n\n", PASSPHRASE);
 
-    // 2. Mnemonic to Seed
+    // 2. Mnemonic to Seed (Rest of the code remains the same initially)
     uint8_t seed[SEED_BYTES];
     mnemonic_to_seed(mnemonic, PASSPHRASE, seed);
     print_hex("BIP32 Root Seed (hex): ", seed, SEED_BYTES);
@@ -272,7 +431,11 @@ int main() {
     char address_str[100]; // General purpose address buffer
 
     // Derive Root Key
-    if (!seed_to_bip32_root_key(&root_key, seed, SEED_BYTES, true)) { free(mnemonic); return 1; }
+    if (!seed_to_bip32_root_key(&root_key, seed, SEED_BYTES, true)) { // Assuming mainnet
+        if (free_mnemonic) free(mnemonic);
+        return 1;
+    }
+
 
     // --- Bitcoin (BTC) ---
     printf("--- Bitcoin (BTC) ---\n");
@@ -291,7 +454,7 @@ int main() {
                 printf("   Address (Bech32): %s\n", address_str);
             } else { printf("   Error generating Bech32 address.\n"); }
         } else { printf("   Error generating HASH160.\n"); }
-        if (address_key.has_private_key && private_key_to_wif(address_key.priv.key, true, wif_str, sizeof(wif_str)) == 0) {
+        if (address_key.has_private_key && private_key_to_wif(address_key.priv.key, BITCOIN_WIF_VERSION, true, wif_str, sizeof(wif_str)) == 0) {
             printf("   Private Key (WIF): %s\n", wif_str);
         }
     } else { printf("   Error deriving BIP84 key.\n"); }
@@ -321,7 +484,7 @@ int main() {
              } else { printf("   Error generating P2SH-SegWit address.\n"); }
         } else { printf("   Error generating script HASH160.\n"); }
     } else { printf("   Error generating public key HASH160.\n"); }
-        if (address_key.has_private_key && private_key_to_wif(address_key.priv.key, true, wif_str, sizeof(wif_str)) == 0) {
+        if (address_key.has_private_key && private_key_to_wif(address_key.priv.key, BITCOIN_WIF_VERSION, true, wif_str, sizeof(wif_str)) == 0) {
             printf("   Private Key (WIF): %s\n", wif_str);
         }
     } else { printf("   Error deriving BIP49 key.\n"); }
@@ -345,7 +508,7 @@ int main() {
                 printf("   Address (Legacy): %s\n", address_str);
             } else { printf("   Error generating Legacy address.\n"); }
         } else { printf("   Error generating HASH160.\n"); }
-        if (address_key.has_private_key && private_key_to_wif(address_key.priv.key, true, wif_str, sizeof(wif_str)) == 0) {
+        if (address_key.has_private_key && private_key_to_wif(address_key.priv.key, BITCOIN_WIF_VERSION, true, wif_str, sizeof(wif_str)) == 0) {
             printf("   Private Key (WIF): %s\n", wif_str);
         }
     } else { printf("   Error deriving BIP44 key.\n"); }
@@ -395,7 +558,6 @@ int main() {
     printf("\n");
 
 
-    // --- Dogecoin (DOGE) ---
     printf("--- Dogecoin (DOGE) ---\n");
     printf("   Path: m/44'/3'/0'/0/0\n");
      if (bip32_derive_child_hardened(&root_key, PURPOSE_BIP44, &purpose_key) &&
@@ -406,15 +568,92 @@ int main() {
     {
         print_hex("   Public Key (hex): ", address_key.pub.key, 33);
         if (public_key_to_hash160(address_key.pub.key, hash160) == 0) {
-            if (hash160_to_p2pkh_addr(hash160, 0x1E, address_str, sizeof(address_str)) == 0) { // 0x1E = DOGE P2PKH version
+            // Use DOGECOIN_P2PKH_VERSION defined earlier
+            if (hash160_to_p2pkh_addr(hash160, DOGECOIN_P2PKH_VERSION, address_str, sizeof(address_str)) == 0) {
                 printf("   Address: %s\n", address_str);
             } else { printf("   Error generating DOGE address.\n"); }
         } else { printf("   Error generating HASH160.\n"); }
-        // Doge WIF uses different version byte (0x9E), need to adjust private_key_to_wif or add specific func if needed
-        // For now, just showing the raw private key if available
-         if (address_key.has_private_key) print_hex("   Private Key (raw hex): ", address_key.priv.key, 32);
+        // Use the modified WIF function with DOGECOIN_WIF_VERSION
+         if (address_key.has_private_key && private_key_to_wif(address_key.priv.key, DOGECOIN_WIF_VERSION, true, wif_str, sizeof(wif_str)) == 0) {
+            printf("   Private Key (WIF): %s\n", wif_str);
+        }
     } else { printf("   Error deriving DOGE key.\n"); }
     printf("\n");
+
+
+    // --- Litecoin (LTC) --- NEW SECTION ---
+    printf("--- Litecoin (LTC) ---\n");
+    printf("   Path: m/44'/2'/0'/0/0\n"); // BIP44 P2PKH path
+     if (bip32_derive_child_hardened(&root_key, PURPOSE_BIP44, &purpose_key) &&
+        bip32_derive_child_hardened(&purpose_key, COIN_TYPE_LTC, &coin_key) &&
+        bip32_derive_child_hardened(&coin_key, ACCOUNT_0, &account_key) &&
+        bip32_derive_child_normal(&account_key, CHANGE_EXTERNAL, &change_key) &&
+        bip32_derive_child_normal(&change_key, ADDRESS_INDEX_0, &address_key))
+    {
+        print_hex("   Public Key (hex): ", address_key.pub.key, 33);
+        if (public_key_to_hash160(address_key.pub.key, hash160) == 0) {
+            // Use LITECOIN_P2PKH_VERSION
+            if (hash160_to_p2pkh_addr(hash160, LITECOIN_P2PKH_VERSION, address_str, sizeof(address_str)) == 0) {
+                printf("   Address (P2PKH): %s\n", address_str);
+            } else { printf("   Error generating LTC address.\n"); }
+        } else { printf("   Error generating HASH160.\n"); }
+        // Use the modified WIF function with LITECOIN_WIF_VERSION
+         if (address_key.has_private_key && private_key_to_wif(address_key.priv.key, LITECOIN_WIF_VERSION, true, wif_str, sizeof(wif_str)) == 0) {
+            printf("   Private Key (WIF): %s\n", wif_str);
+        }
+    } else { printf("   Error deriving LTC key.\n"); }
+    printf("\n");
+
+    // --- Dash (DASH) --- NEW SECTION ---
+    printf("--- Dash (DASH) ---\n");
+    printf("   Path: m/44'/5'/0'/0/0\n"); // BIP44 P2PKH path
+     if (bip32_derive_child_hardened(&root_key, PURPOSE_BIP44, &purpose_key) &&
+        bip32_derive_child_hardened(&purpose_key, COIN_TYPE_DASH, &coin_key) &&
+        bip32_derive_child_hardened(&coin_key, ACCOUNT_0, &account_key) &&
+        bip32_derive_child_normal(&account_key, CHANGE_EXTERNAL, &change_key) &&
+        bip32_derive_child_normal(&change_key, ADDRESS_INDEX_0, &address_key))
+    {
+        print_hex("   Public Key (hex): ", address_key.pub.key, 33);
+        if (public_key_to_hash160(address_key.pub.key, hash160) == 0) {
+            // Use DASH_P2PKH_VERSION
+            if (hash160_to_p2pkh_addr(hash160, DASH_P2PKH_VERSION, address_str, sizeof(address_str)) == 0) {
+                printf("   Address (P2PKH): %s\n", address_str);
+            } else { printf("   Error generating DASH address.\n"); }
+        } else { printf("   Error generating HASH160.\n"); }
+        // Use the modified WIF function with DASH_WIF_VERSION
+         if (address_key.has_private_key && private_key_to_wif(address_key.priv.key, DASH_WIF_VERSION, true, wif_str, sizeof(wif_str)) == 0) {
+            printf("   Private Key (WIF): %s\n", wif_str);
+        }
+    } else { printf("   Error deriving DASH key.\n"); }
+    printf("\n");
+
+   // --- Zcash (ZEC) --- NEW SECTION ---
+printf("--- Zcash (ZEC) Transparent ---\n");
+printf("   Path: m/44'/133'/0'/0/0\n"); // BIP44 t-addr path
+ if (bip32_derive_child_hardened(&root_key, PURPOSE_BIP44, &purpose_key) &&
+    bip32_derive_child_hardened(&purpose_key, COIN_TYPE_ZEC, &coin_key) &&
+    bip32_derive_child_hardened(&coin_key, ACCOUNT_0, &account_key) &&
+    bip32_derive_child_normal(&account_key, CHANGE_EXTERNAL, &change_key) &&
+    bip32_derive_child_normal(&change_key, ADDRESS_INDEX_0, &address_key))
+{
+    print_hex("   Public Key (hex): ", address_key.pub.key, 33);
+    if (public_key_to_hash160(address_key.pub.key, hash160) == 0) {
+        // --- USE THE NEW FUNCTION for ZEC t-addr P2PKH ---
+        if (prefix2_hash160_to_base58_addr(ZCASH_T_P2PKH_PREFIX1, ZCASH_T_P2PKH_PREFIX2, hash160, address_str, sizeof(address_str)) == 0) {
+             printf("   Address (t-addr P2PKH): %s\n", address_str); // <<< Now generates the address
+        } else {
+             printf("   Error generating ZEC t-addr address.\n");
+             // Optional: Print HASH160 if address generation failed
+             // print_hex("   Address HASH160 (hex): ", hash160, RIPEMD160_DIGEST_LENGTH);
+        }
+        // --- END ZEC ADDRESS GENERATION ---
+    } else { printf("   Error generating HASH160.\n"); }
+    // Use the modified WIF function with ZCASH_WIF_VERSION
+     if (address_key.has_private_key && private_key_to_wif(address_key.priv.key, ZCASH_WIF_VERSION, true, wif_str, sizeof(wif_str)) == 0) {
+        printf("   Private Key (WIF): %s\n", wif_str);
+    }
+} else { printf("   Error deriving ZEC key.\n"); }
+printf("\n");
 
     // --- Bitcoin Cash (BCH) ---
     printf("--- Bitcoin Cash (BCH) ---\n");
@@ -427,20 +666,46 @@ int main() {
     {
         print_hex("   Public Key (hex): ", address_key.pub.key, 33);
         if (public_key_to_hash160(address_key.pub.key, hash160) == 0) {
-            // Use CashAddr format with "bitcoincash:" prefix (library might add it or expect it)
-            if (hash160_to_cashaddr(hash160, "bitcoincash", address_str, sizeof(address_str)) == 0) {
+            if (hash160_to_cashaddr(hash160, BITCOIN_CASH_PREFIX, address_str, sizeof(address_str)) == 0) {
                 printf("   Address (CashAddr): %s\n", address_str);
             } else { printf("   Error generating CashAddr address.\n"); }
         } else { printf("   Error generating HASH160.\n"); }
-        if (address_key.has_private_key && private_key_to_wif(address_key.priv.key, true, wif_str, sizeof(wif_str)) == 0) {
-            printf("   Private Key (WIF): %s\n", wif_str); // BCH uses same WIF as BTC
+        // Use BITCOIN_CASH_WIF_VERSION (same as BTC)
+        if (address_key.has_private_key && private_key_to_wif(address_key.priv.key, BITCOIN_CASH_WIF_VERSION, true, wif_str, sizeof(wif_str)) == 0) {
+            printf("   Private Key (WIF): %s\n", wif_str);
         }
     } else { printf("   Error deriving BCH key.\n"); }
     printf("\n");
 
 
+    // --- Bitcoin Gold (BTG) --- NEW SECTION ---
+    printf("--- Bitcoin Gold (BTG) ---\n");
+    printf("   Path: m/44'/156'/0'/0/0\n"); // BIP44 P2PKH path
+     if (bip32_derive_child_hardened(&root_key, PURPOSE_BIP44, &purpose_key) &&
+        bip32_derive_child_hardened(&purpose_key, COIN_TYPE_BTG, &coin_key) &&
+        bip32_derive_child_hardened(&coin_key, ACCOUNT_0, &account_key) &&
+        bip32_derive_child_normal(&account_key, CHANGE_EXTERNAL, &change_key) &&
+        bip32_derive_child_normal(&change_key, ADDRESS_INDEX_0, &address_key))
+    {
+        print_hex("   Public Key (hex): ", address_key.pub.key, 33);
+        if (public_key_to_hash160(address_key.pub.key, hash160) == 0) {
+            // Use BITCOIN_GOLD_P2PKH_VERSION
+            if (hash160_to_p2pkh_addr(hash160, BITCOIN_GOLD_P2PKH_VERSION, address_str, sizeof(address_str)) == 0) {
+                printf("   Address (P2PKH): %s\n", address_str);
+            } else { printf("   Error generating BTG address.\n"); }
+        } else { printf("   Error generating HASH160.\n"); }
+        // Use BITCOIN_GOLD_WIF_VERSION (same as BTC)
+         if (address_key.has_private_key && private_key_to_wif(address_key.priv.key, BITCOIN_GOLD_WIF_VERSION, true, wif_str, sizeof(wif_str)) == 0) {
+            printf("   Private Key (WIF): %s\n", wif_str);
+        }
+    } else { printf("   Error deriving BTG key.\n"); }
+    printf("\n");
+
+
     // Clean up
-    free(mnemonic);
+    if (free_mnemonic) { // Only free if we allocated it
+         free(mnemonic);
+    }
 
     return 0;
 }
