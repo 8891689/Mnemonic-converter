@@ -30,7 +30,7 @@ This is a command-line tool written in C to demonstrate the process of generatin
 Ensure all `.c` files (`main.c`, `bip32.c`, `bip39.c`, `secp256k1.c`, `base58.c`, `ripemd160.c`, `sha256.c`, `sha512.c`, `pbkdf2.c`, `random.c`, `keccak256.c`, `cashaddr.c`, `bech32.c`) and their corresponding `.h` files are in the same directory. Then, compile using GCC:
 
 ```bash
-gcc -o bip32_test bip32.c main.c secp256k1.c base58.c ripemd160.c sha256.c sha512.c pbkdf2.c random.c bip39.c keccak256.c cashaddr.c bech32.c
+gcc -o m bip32.c mnemonics.c secp256k1.c base58.c ripemd160.c sha256.c sha512.c pbkdf2.c random.c bip39.c keccak256.c cashaddr.c bech32.c
 ```
 or
 ```
@@ -43,14 +43,15 @@ make clean
 Usage
 Run the compiled executable directly:
 ```
-./bip32_test
+./m
 ```
-
-The program will output the generated mnemonic phrase, root seed, and detailed information (public key, address, private key) for each coin at the default derivation path.
-
+Or you already have a mnemonic phrase and need to view the seed private key address and other information
+```
+./m echo earn pink table vehicle awful true shop hazard latin useful admit
+```
 Configuration
 
-You can modify the following macro definitions at the top of the main.c file to adjust the behavior:
+You can modify the following macro definitions at the top of the mnemonics.c file to adjust the behavior:
 ```
 #define NUM_WORDS 12: Change to 24 to generate a 24-word mnemonic phrase.
 
@@ -61,55 +62,159 @@ You need to recompile the program after making changes.
 # Example Output
 
 ```
-./bip32_test
+./m
 --- Wallet Details ---
-Generated Mnemonic (12 words): control vessel radio make clinic spatial slogan include disease luggage rate clump
+No mnemonic provided via arguments. Generating a random one...
+Generated Mnemonic (12 words): echo earn pink table vehicle awful true shop hazard latin useful admit
 Passphrase Used: ""
 
-BIP32 Root Seed (hex): 06446bc5e37843e194074eb3b28d18926ec5df427e2b8c56fa2e75c0b438425daff682d48d1b94764e1b262fc62af626eac8ad34550c0717f2ca0f1171784f5b
+BIP32 Root Seed (hex): c5868acb3649f8bdc0d511de39fd9669ff17a51d8eab5d818a30f3b165183873e6418fa76f9fdd63cd24349bb540cef46f7f356c07aa396e88cd17493bbb4584
 
 --- Bitcoin (BTC) ---
 -> BIP84 Native SegWit (P2WPKH)
    Path: m/84'/0'/0'/0/0
-   Public Key (hex): 0341f837650ea37caff3b74b044a350abd1de3b9e74c2d51feabfaf82b55ec0eab
-   Address (Bech32): bc1q4qd4l4jhmq42c3sqdt42lml2fee3dszazw88rk
-   Private Key (WIF): L5FasiwESjWjWftPW35G4UBHUM2uM4oPopifyGHRNVfNnnQ7KpFp
+   Public Key (hex): 027397c2e951b1587820c9e6eecceeaa31c1d4d3e04aa7a3bb4b81fb8f46abf6ed
+   Address (Bech32): bc1qglrv4e5za0uar4kdpaxqcpyjf0yq95keqxfe3k
+   Private Key (WIF): L1MFzV4BjqC2sqShZfMwTKPTKCE3ASfWJTUvbUWagzeEMgkcctDq
 -> BIP49 Wrapped SegWit (P2SH-P2WPKH)
    Path: m/49'/0'/0'/0/0
-   Public Key (hex): 0390733e756c2619198cd355a87596fd49925cbb14ddd8e1593ac728183084acad
-   Address (P2SH-SegWit): 3DJCCamWQkh7AP9cDBhEq4iXbVQZGN9zhC
-   Private Key (WIF): L5Ep9KUW4WhhbUtSYJa3bFE9FXiYsVxSoF9HX2kAAi5mFkEoxbg5
+   Public Key (hex): 020f9a2bf484a3d8a29a05ea02bca5f8cf8b86f36fe4a1bf9b59f9a0ee0aad714c
+   Address (P2SH-SegWit): 34fHczsmL2uF864rrSWDXKdCDzC56JQjVR
+   Private Key (WIF): L17s6Rpmu7VMmNXbTekxrCtM7n12LeDZNmmq6GVQxiart1fr9uzG
 -> BIP44 Legacy (P2PKH)
    Path: m/44'/0'/0'/0/0
-   Account xpub: xpub6CnfqzcthpdddSHuuBcha5ar3S8yrHJzoz9WwnfJx5EzrL5gzo9PNjSLqKPkBmqMFQEpEq1TcLUbhqrMWLmt273CEjokvh6FB7sHgoZP2zU
-   Account xprv: xprv9yoKSV5zsT5LQxDSoA5hCwe7VQJVSpb9SmDv9QFhPji1yXkYTFq8pw7rz13jYC7KCcq5hGghviho5z86HhZY4uvfPJVFBKHi7FhSRLMhdah
-   Public Key (hex): 028c928b3b8b6a1d1b25be2efe710afc239056546d5064440fcb4754528d33783c
-   Address (Legacy): 14h63PEQ5LWS3fX7QdMSZ6a4sdcH2pBofn
-   Private Key (WIF): Kz2C4GVDijXBR6ukuhd4qdSyLywyu41WyuDnD9Trkdy3o4VRVwhF
+   Account xpub: xpub6DJGeV8143BfMXRJdjkrGht5GzkTxL8Qov5rGh5XGXMSFVgK2J4P8tnDrJWRKiSdhQGzsimxRtSCrLzfihPUmRopJ29ECUXY9n1c6mHw2Ps
+   Account xprv: xprv9zJvEyb7DfdN93LqXiDquZwLixuyYsQZShAFUJfuiBpTNhMAUkk8b6Tk11XbbK9NM71EJDQimmbG14sbUMA3qa1E6EFJXYej4i2mD7NRRyx
+   Public Key (hex): 029614b2ade98fd69654fb4a983827f266d43640e82ec1951d6c3a93ef9dd9b194
+   Address (Legacy): 1ATusFfGDREyWbj5J2Ti2nuYFV4hmH3t67
+   Private Key (WIF): L3DfMm9mxiKNAjpg2geM18mT5aGqsTMhWxaEFXaDidQHpXGXkgBp
 
 --- Ethereum (ETH) ---
    Path: m/44'/60'/0'/0/0
-   Private Key (hex): 1d43369e0c0fb6faa997a72d8634df7c07d849d071bf45309221ed61cee0a0ba
-   Public Key (uncompressed hex): 046cd0859bc2a3fcce661ef0b71d546f21d7175692c907884a9fb81990eb01b8f24b1e614aa9077ac8ed68048bbd2284f6a2a49a694fb8b0a2f509478299a00963
-   Address: 0xefa0b814fc95b45f81a95d33b042bec6becd91a6
+   Private Key (hex): 86f672ab1ecedd420c8e12af3e0dd130037173dbb3cc73cc5475d2b5335def20
+   Public Key (uncompressed hex): 042ddcf2e1c64ced63514c72e0a91a34709820de7eea84c030669efec154eaf6c7f261077242847153fe509ec26f022109a431133594a4010a634cfddd48459c6d
+   Address: 0x822bf5eb121b2d35454a43cb748a6128e61b9db3
 
 --- Tron (TRX) ---
    Path: m/44'/195'/0'/0/0
-   Private Key (hex): 9b60d4f6ab911fee716dfbe6fc84da082d6604df195e86e4b1aad108078f968d
-   Public Key (uncompressed hex): 041530855bb24346d924f13c629c5acb18221536efdfe25f38fae0f13b7bfeeb5268dae350f673c6237a2601bd1a2356910536d0ac13f8bb4ce7bc2a5c9efead27
-   Address: TQtNeyDMEKa1MdJGrYqoBxceXDijege9eS
+   Private Key (hex): aede8ae7dabb418f76e2f8a5c2fb142889c8c0051efbe7534f1e8ab03f9c8b1f
+   Public Key (uncompressed hex): 040384aae86a01bed9c466b983924f87ab0fec847b3c9c4efaf6f12cf2f8eeb3ba82c220d15e3f483e16227e1b8c7b5f854ae0ea8e1dc6ec50980539a0c4462395
+   Address: TYeVsFupZKnKs9XCqjJrCTjhDFeQ7ySYBa
 
 --- Dogecoin (DOGE) ---
    Path: m/44'/3'/0'/0/0
-   Public Key (hex): 026e0450e1b5889662e4d1c6d088f64a55ba280c7898ad7b90ade2cbb5d897079d
-   Address: DGrj7JxZUVyY82YVRQw62TugNUXyQWvZcC
-   Private Key (raw hex): 7f5a38e2f774425a7c58aa3a924dacc4e2903b33ff3a40763043e59c0eebdafd
+   Public Key (hex): 036d814c0f92d20117d7e2ce6f8f8c119c2dd857da2d97d8230c7e44abcd5ff303
+   Address: DGxqvPTGiDFzcHjzoQhNjyrkAXvvHieery
+   Private Key (WIF): QRp1bZwGdmLvAGmmF7KDdnuYNozh17ew1tFqJFjUHw2tcNtij2A5
+
+--- Litecoin (LTC) ---
+   Path: m/44'/2'/0'/0/0
+   Public Key (hex): 02d4f100d0500084d9a1dbbbf28447f3f551d400777d4be3a4d007e764b252009f
+   Address (P2PKH): LWuNYd19sC7ReGM176AgaTJMWAzxAnrLS4
+   Private Key (WIF): T58P4SYovX3TxmHgiXr8jaFWGxBmwTQPurbRg1i2XVRwis93wUxs
+
+--- Dash (DASH) ---
+   Path: m/44'/5'/0'/0/0
+   Public Key (hex): 025c129fef4a518fdcbbf356835e9f50917e1b2fa40bc54eca4b7efd742e704f67
+   Address (P2PKH): Xo3Zm6zUQb3FzQsyVfwM8kFNDBqZqW9fCt
+   Private Key (WIF): XHNMi4j6s7zoGGwnorgQYUgfwGS3xdjzhTAWhb9U7HHmDH9H2542
+
+--- Zcash (ZEC) Transparent ---
+   Path: m/44'/133'/0'/0/0
+   Public Key (hex): 0208b91a797ae243538eb334e82bbd177cb423f5ee21e48b3f435021a8625e8491
+   Address (t-addr P2PKH): t1NdciUewTiNDg9A6Xau44NJDbx4vzLzBSb
+   Private Key (WIF): L2n8zhnotshTf4ZmMhEMuiVPgZJZ8Fg9DNKVc7Jy7znpC1488EPt
 
 --- Bitcoin Cash (BCH) ---
    Path: m/44'/145'/0'/0/0
-   Public Key (hex): 02d286cdcc484897d3a7b57ba9a846c3a131303673b978d793c4eacde0cdcfead4
-   Address (CashAddr): bitcoincash:qpha9ndx6clh2qur866632jgfu9ca9767sqqjyh5ax
-   Private Key (WIF): L5NZPBUuJMtp7Lk7mNUEsWtru9Dw95KuE6qYMMqC4DPxhMY26yS3
+   Public Key (hex): 02f00702920463fe1b3e8852d8ac7371c7417aeaa8200e256ecee4434ab88f24c6
+   Address (CashAddr): bitcoincash:qzlj9z8z4t0gfskxmzej7qfjq9waxenae5cq3zvuz4
+   Private Key (WIF): L16t2RUBV1g48M7sFmnw8gVXCg3TPfnuceH79QBXp3wjH4RfkkK7
+
+--- Bitcoin Gold (BTG) ---
+   Path: m/44'/156'/0'/0/0
+   Public Key (hex): 02c308ecfa035f1d9ed915ee4915bd91098ee25608ba058582745fd85ec0c9d5a6
+   Address (P2PKH): Gh5kQ5PCJoDSimie2v5PRBfX1C5Aq5HWzS
+   Private Key (WIF): Kz5sK16wd8hvmH81SMZTaEnvQ57orpHUp5KCFuiGvgCRFk3CFhwg
+
+----------------------------------------------------------------------------------------------------
+
+or
+
+./m echo earn pink table vehicle awful true shop hazard latin useful admit
+--- Wallet Details ---
+Using Mnemonic from arguments: echo earn pink table vehicle awful true shop hazard latin useful admit
+Passphrase Used: ""
+
+BIP32 Root Seed (hex): c5868acb3649f8bdc0d511de39fd9669ff17a51d8eab5d818a30f3b165183873e6418fa76f9fdd63cd24349bb540cef46f7f356c07aa396e88cd17493bbb4584
+
+--- Bitcoin (BTC) ---
+-> BIP84 Native SegWit (P2WPKH)
+   Path: m/84'/0'/0'/0/0
+   Public Key (hex): 027397c2e951b1587820c9e6eecceeaa31c1d4d3e04aa7a3bb4b81fb8f46abf6ed
+   Address (Bech32): bc1qglrv4e5za0uar4kdpaxqcpyjf0yq95keqxfe3k
+   Private Key (WIF): L1MFzV4BjqC2sqShZfMwTKPTKCE3ASfWJTUvbUWagzeEMgkcctDq
+-> BIP49 Wrapped SegWit (P2SH-P2WPKH)
+   Path: m/49'/0'/0'/0/0
+   Public Key (hex): 020f9a2bf484a3d8a29a05ea02bca5f8cf8b86f36fe4a1bf9b59f9a0ee0aad714c
+   Address (P2SH-SegWit): 34fHczsmL2uF864rrSWDXKdCDzC56JQjVR
+   Private Key (WIF): L17s6Rpmu7VMmNXbTekxrCtM7n12LeDZNmmq6GVQxiart1fr9uzG
+-> BIP44 Legacy (P2PKH)
+   Path: m/44'/0'/0'/0/0
+   Account xpub: xpub6DJGeV8143BfMXRJdjkrGht5GzkTxL8Qov5rGh5XGXMSFVgK2J4P8tnDrJWRKiSdhQGzsimxRtSCrLzfihPUmRopJ29ECUXY9n1c6mHw2Ps
+   Account xprv: xprv9zJvEyb7DfdN93LqXiDquZwLixuyYsQZShAFUJfuiBpTNhMAUkk8b6Tk11XbbK9NM71EJDQimmbG14sbUMA3qa1E6EFJXYej4i2mD7NRRyx
+   Public Key (hex): 029614b2ade98fd69654fb4a983827f266d43640e82ec1951d6c3a93ef9dd9b194
+   Address (Legacy): 1ATusFfGDREyWbj5J2Ti2nuYFV4hmH3t67
+   Private Key (WIF): L3DfMm9mxiKNAjpg2geM18mT5aGqsTMhWxaEFXaDidQHpXGXkgBp
+
+--- Ethereum (ETH) ---
+   Path: m/44'/60'/0'/0/0
+   Private Key (hex): 86f672ab1ecedd420c8e12af3e0dd130037173dbb3cc73cc5475d2b5335def20
+   Public Key (uncompressed hex): 042ddcf2e1c64ced63514c72e0a91a34709820de7eea84c030669efec154eaf6c7f261077242847153fe509ec26f022109a431133594a4010a634cfddd48459c6d
+   Address: 0x822bf5eb121b2d35454a43cb748a6128e61b9db3
+
+--- Tron (TRX) ---
+   Path: m/44'/195'/0'/0/0
+   Private Key (hex): aede8ae7dabb418f76e2f8a5c2fb142889c8c0051efbe7534f1e8ab03f9c8b1f
+   Public Key (uncompressed hex): 040384aae86a01bed9c466b983924f87ab0fec847b3c9c4efaf6f12cf2f8eeb3ba82c220d15e3f483e16227e1b8c7b5f854ae0ea8e1dc6ec50980539a0c4462395
+   Address: TYeVsFupZKnKs9XCqjJrCTjhDFeQ7ySYBa
+
+--- Dogecoin (DOGE) ---
+   Path: m/44'/3'/0'/0/0
+   Public Key (hex): 036d814c0f92d20117d7e2ce6f8f8c119c2dd857da2d97d8230c7e44abcd5ff303
+   Address: DGxqvPTGiDFzcHjzoQhNjyrkAXvvHieery
+   Private Key (WIF): QRp1bZwGdmLvAGmmF7KDdnuYNozh17ew1tFqJFjUHw2tcNtij2A5
+
+--- Litecoin (LTC) ---
+   Path: m/44'/2'/0'/0/0
+   Public Key (hex): 02d4f100d0500084d9a1dbbbf28447f3f551d400777d4be3a4d007e764b252009f
+   Address (P2PKH): LWuNYd19sC7ReGM176AgaTJMWAzxAnrLS4
+   Private Key (WIF): T58P4SYovX3TxmHgiXr8jaFWGxBmwTQPurbRg1i2XVRwis93wUxs
+
+--- Dash (DASH) ---
+   Path: m/44'/5'/0'/0/0
+   Public Key (hex): 025c129fef4a518fdcbbf356835e9f50917e1b2fa40bc54eca4b7efd742e704f67
+   Address (P2PKH): Xo3Zm6zUQb3FzQsyVfwM8kFNDBqZqW9fCt
+   Private Key (WIF): XHNMi4j6s7zoGGwnorgQYUgfwGS3xdjzhTAWhb9U7HHmDH9H2542
+
+--- Zcash (ZEC) Transparent ---
+   Path: m/44'/133'/0'/0/0
+   Public Key (hex): 0208b91a797ae243538eb334e82bbd177cb423f5ee21e48b3f435021a8625e8491
+   Address (t-addr P2PKH): t1NdciUewTiNDg9A6Xau44NJDbx4vzLzBSb
+   Private Key (WIF): L2n8zhnotshTf4ZmMhEMuiVPgZJZ8Fg9DNKVc7Jy7znpC1488EPt
+
+--- Bitcoin Cash (BCH) ---
+   Path: m/44'/145'/0'/0/0
+   Public Key (hex): 02f00702920463fe1b3e8852d8ac7371c7417aeaa8200e256ecee4434ab88f24c6
+   Address (CashAddr): bitcoincash:qzlj9z8z4t0gfskxmzej7qfjq9waxenae5cq3zvuz4
+   Private Key (WIF): L16t2RUBV1g48M7sFmnw8gVXCg3TPfnuceH79QBXp3wjH4RfkkK7
+
+--- Bitcoin Gold (BTG) ---
+   Path: m/44'/156'/0'/0/0
+   Public Key (hex): 02c308ecfa035f1d9ed915ee4915bd91098ee25608ba058582745fd85ec0c9d5a6
+   Address (P2PKH): Gh5kQ5PCJoDSimie2v5PRBfX1C5Aq5HWzS
+   Private Key (WIF): Kz5sK16wd8hvmH81SMZTaEnvQ57orpHUp5KCFuiGvgCRFk3CFhwg
+
 
 ```
 
@@ -126,7 +231,8 @@ DOGE: DTszb9cPALbG9ESNJMFJt4ECqWGRCgucky
 TRX: TAHUmjyzg7B3Nndv264zWYUhQ9HUmX4Xu4
 ```
 # 📜 Disclaimer
-⚠️ Reminder: Do not input real private keys on connected devices!
-To reiterate, this code is intended solely for learning and understanding how standards like BIP32/BIP39/BIP44 work. The security of the random number generator has not been rigorously audited. Do not use keys generated by this program to store actual, valuable cryptocurrency assets. The developers are not responsible for any loss of funds resulting from the use of this code.
+This code is only used to learn and understand the working principles of standards such as BIP32/BIP39/BIP44. The random number generator uses highly random numbers and complies with encryption industry standards.
+
+⚠️ Reminder: Do not enter the real private key on a device connected to the network! Especially when the VPN proxy is connected, the information is intercepted and intercepted, which has a high security risk, or it is infected by viruses and trojans, etc. This project is completely open source and there is no risk of backdoors or interception of information. Please confirm that it is safe before using this program. The developer is not responsible for any financial losses caused by the use of this code.
 
 
