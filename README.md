@@ -27,7 +27,7 @@ This is a command-line tool written in C to demonstrate the process of generatin
 
 ## Compilation
 
-Ensure all `.c` files (`main.c`, `bip32.c`, `bip39.c`, `secp256k1.c`, `base58.c`, `ripemd160.c`, `sha256.c`, `sha512.c`, `pbkdf2.c`, `random.c`, `keccak256.c`, `cashaddr.c`, `bech32.c`) and their corresponding `.h` files are in the same directory. Then, compile using GCC:
+Ensure all `.c` files (`mnemonics.c`, `bip32.c`, `bip39.c`, `secp256k1.c`, `base58.c`, `ripemd160.c`, `sha256.c`, `sha512.c`, `pbkdf2.c`, `random.c`, `keccak256.c`, `cashaddr.c`, `bech32.c`) and their corresponding `.h` files are in the same directory. Then, compile using GCC:
 
 ```bash
 gcc -o m bip32.c mnemonics.c secp256k1.c base58.c ripemd160.c sha256.c sha512.c pbkdf2.c random.c bip39.c keccak256.c cashaddr.c bech32.c
